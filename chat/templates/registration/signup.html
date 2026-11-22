@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PIGEON - Sign up</title>
+</head>
+<body>
+    <h1>Sign up</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Create account</button>
+    </form>
+    <p>Account hai? <a href="{% url 'login' %}">Login</a></p>
+</body>
+</html>
