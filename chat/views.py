@@ -1,8 +1,10 @@
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import SignupForm
+from .models import Message, User
 
 
 def signup(request):
@@ -21,5 +23,18 @@ def signup(request):
 
 @login_required
 def home(request):
-    return render(request, 'chat/home.html')
-# Create your views here.
+    users = User.objects.exclude(id=request.user.id).order_by('username')
+    return render(request, 'chat/home.html', {'users': users})
+
+
+@login_required
+def chat_room(request, username):
+    other = get_object_or_404(User, username=username)
+    messages = Message.objects.filter(
+        Q(sender=request.user, receiver=other) |
+        Q(sender=other, receiver=request.user)
+    )
+    return render(request, 'chat/room.html', {
+        'other': other,
+        'messages': messages,
+    })

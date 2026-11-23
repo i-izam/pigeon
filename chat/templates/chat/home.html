@@ -1,18 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>PIGEON</title>
 </head>
-
 <body>
     <h1>Welcome, {{ request.user.username }}!</h1>
-    <p>Chat UI yahan banegi.</p>
+
+    <h2>Users</h2>
+    <ul>
+        {% for u in users %}
+            <li><a href="{% url 'chat_room' u.username %}">{{ u.username }}</a></li>
+        {% empty %}
+            <li>Abhi koi aur user nahi hai.</li>
+        {% endfor %}
+    </ul>
+
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
         <button type="submit">Logout</button>
     </form>
 </body>
-
 </html>

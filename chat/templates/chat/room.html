@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PIGEON - {{ other.username }}</title>
+</head>
+<body>
+    <p><a href="{% url 'home' %}">&larr; Back</a></p>
+    <h2>Chat with {{ other.username }}</h2>
+
+    <div id="chat-log">
+        {% for m in messages %}
+            <p><strong>{{ m.sender.username }}:</strong> {{ m.text }}</p>
+        {% empty %}
+            <p>Abhi koi message nahi hai.</p>
+        {% endfor %}
+    </div>
+</body>
+</html>
