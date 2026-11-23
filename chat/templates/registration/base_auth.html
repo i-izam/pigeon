@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}PIGEON{% endblock %}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(180deg, #075e54 0 220px, #e5ddd5 220px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 16px;
+        }
+
+        .brand {
+            color: #fff;
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: #fff;
+            width: 100%;
+            max-width: 380px;
+            padding: 28px 24px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .card h1 {
+            margin: 0 0 20px;
+            font-size: 22px;
+            color: #075e54;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #444;
+        }
+
+        .field input {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .field input:focus {
+            border-color: #075e54;
+        }
+
+        .help {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            color: #777;
+        }
+
+        .help ul {
+            margin: 4px 0 0;
+            padding-left: 18px;
+        }
+
+        .error {
+            background: #fdecea;
+            color: #b3261e;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .field .error {
+            margin: 6px 0 0;
+        }
+
+        button.primary {
+            width: 100%;
+            padding: 11px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            background: #075e54;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        button.primary:hover {
+            background: #064d44;
+        }
+
+        .switch {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .switch a {
+            color: #075e54;
+            font-weight: bold;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="brand">PIGEON</div>
+    <div class="card">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+
+</html>
