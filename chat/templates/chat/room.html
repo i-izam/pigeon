@@ -1,19 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>PIGEON - {{ other.username }}</title>
 </head>
+
 <body>
     <p><a href="{% url 'home' %}">&larr; Back</a></p>
     <h2>Chat with {{ other.username }}</h2>
 
     <div id="chat-log">
         {% for m in messages %}
-            <p><strong>{{ m.sender.username }}:</strong> {{ m.text }}</p>
+        <p><strong>{{ m.sender.username }}:</strong> {{ m.text }}</p>
         {% empty %}
-            <p>Abhi koi message nahi hai.</p>
+        <p id="empty-msg">Abhi koi message nahi hai.</p>
         {% endfor %}
     </div>
+
+    <input id="chat-input" type="text" placeholder="Message likho..." size="40" autofocus>
+    <button id="chat-send">Send</button>
+
+    {{ other.username|json_script:"other-username" }}
+
+    <script>
+        const other = JSON.parse(document.getElementById('other-username').textContent);
+        const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+        const socket = new WebSocket(
+            `${scheme}://${location.host}/ws/chat/${encodeURIComponent(other)}/`
+        );
+
+        const log = document.getElementById('chat-log');
+        const input = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('chat-send');
+
+        socket.onmessage = function (e) {
+            const data = JSON.parse(e.data);
+            const empty = document.getElementById('empty-msg');
+            if (empty) empty.remove();
+
+            const p = document.createElement('p');
+            const strong = document.createElement('strong');
+            strong.textContent = data.sender + ': ';
+            p.appendChild(strong);
+            p.appendChild(document.createTextNode(data.message));
+            log.appendChild(p);
+        };
+
+        socket.onclose = function () {
+            console.log('WebSocket closed');
+        };
+
+        function sendMessage() {
+            const text = input.value.trim();
+            if (!text || socket.readyState !== WebSocket.OPEN) return;
+            socket.send(JSON.stringify({message: text}));
+            input.value = '';
+            input.focus();
+        }
+
+        sendBtn.onclick = sendMessage;
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
 </body>
+
 </html>
