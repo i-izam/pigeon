@@ -23,6 +23,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.room_group_name = f'chat_{a}_{b}'
 
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        print(f'[WS] CONNECT user={self.user.username} other={self.other.username} group={self.room_group_name}')
         await self.accept()
 
     async def disconnect(self, close_code):
@@ -35,6 +36,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         text = data.get('message', '').strip()
         if not text:
+            print(f'[WS] RECEIVE from={self.user.username} to={self.other.username} text={text}')
             return
 
         await self.save_message(text)
