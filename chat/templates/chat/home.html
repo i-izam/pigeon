@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -113,6 +114,21 @@
 
         .name {
             font-size: 16px;
+            flex: 1;
+        }
+
+        .badge {
+            background: #25d366;
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
+            border-radius: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .empty {
@@ -140,22 +156,35 @@
     </div>
 
     <div class="container">
-        <input id="search" class="search" type="text" placeholder="Search users..." autocomplete="off">
+        <input id="search" class="search" type="text"
+               placeholder="Search users..." autocomplete="off">
 
         <div class="list" id="user-list">
             {% for u in users %}
-            <a class="user" href="{% url 'chat_room' u.username %}" data-name="{{ u.username|lower }}">
+            <a class="user"
+               href="{% url 'chat_room' u.username %}"
+               data-name="{{ u.username|lower }}"
+               data-user-id="{{ u.id }}">
+
                 <div class="avatar">{{ u.username|first|upper }}</div>
+
                 <span class="name">{{ u.username }}</span>
+
+                {% if u.unread %}
+                    <span class="badge">{{ u.unread }}</span>
+                {% endif %}
             </a>
             {% empty %}
             <div class="empty">Abhi koi aur user nahi hai.</div>
             {% endfor %}
+
             <div class="empty" id="no-match">Koi user nahi mila.</div>
         </div>
     </div>
 
     <script>
+        // Existing user search functionality
+
         const search = document.getElementById('search');
         const items = document.querySelectorAll('.user');
         const noMatch = document.getElementById('no-match');
@@ -163,13 +192,66 @@
         search.addEventListener('input', function () {
             const q = search.value.trim().toLowerCase();
             let visible = 0;
+
             items.forEach(function (el) {
                 const show = el.dataset.name.includes(q);
                 el.style.display = show ? 'flex' : 'none';
+
                 if (show) visible++;
             });
-            noMatch.style.display = (items.length > 0 && visible === 0) ? 'block' : 'none';
+
+            noMatch.style.display =
+                (items.length > 0 && visible === 0) ? 'block' : 'none';
         });
+
+
+        // PIGEON: Real-time unread notifications
+
+        const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+
+        const notificationSocket = new WebSocket(
+            `${scheme}://${window.location.host}/ws/notifications/`
+        );
+
+        notificationSocket.onmessage = function (e) {
+            const data = JSON.parse(e.data);
+
+            if (data.type !== 'unread_update') return;
+
+            const counts = data.counts || {};
+
+            items.forEach(function (el) {
+                const userId = el.dataset.userId;
+                const count = Number(counts[userId] || 0);
+
+                let badge = el.querySelector('.badge');
+
+                if (count > 0) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'badge';
+                        el.appendChild(badge);
+                    }
+
+                    badge.textContent = count;
+
+                } else if (badge) {
+                    badge.remove();
+                }
+            });
+        };
+
+        notificationSocket.onopen = function () {
+            console.log('PIGEON: Notifications connected!');
+        };
+
+        notificationSocket.onerror = function (error) {
+            console.error('PIGEON notification error:', error);
+        };
+
+        notificationSocket.onclose = function () {
+            console.log('PIGEON: Notifications disconnected');
+        };
     </script>
 </body>
 
