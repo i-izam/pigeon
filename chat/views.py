@@ -10,6 +10,8 @@ from channels.layers import get_channel_layer
 from .forms import SignupForm
 from .models import Message, User
 
+def splash(request):
+    return render(request, 'chat/splash.html')
 
 def signup(request):
     if request.user.is_authenticated:

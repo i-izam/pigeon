@@ -95,11 +95,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def mark_read(self, message_id):
+        print("MARK_READ:", message_id, "by", self.user.username)
         Message.objects.filter(
             id=message_id,
             receiver=self.user
         ).update(is_read=True)
-
 
 class NotificationConsumer(AsyncWebsocketConsumer):
 
