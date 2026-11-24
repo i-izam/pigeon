@@ -75,6 +75,15 @@
             color: #666;
         }
 
+        /* PIGEON: typing indicator, message box ke upar */
+        .typing {
+            font-size: 13px;
+            min-height: 22px;
+            padding: 2px 16px 4px;
+            color: #075e54;
+            font-style: italic;
+        }
+
         .input-bar {
             display: flex;
             gap: 8px;
@@ -106,7 +115,9 @@
 <body>
     <div class="header">
         <a href="{% url 'home' %}">&larr;</a>
-        <h2>{{ other.username }}</h2>
+        <div>
+            <h2>{{ other.username }}</h2>
+        </div>
     </div>
 
     <div id="chat-log">
@@ -119,6 +130,8 @@
         <p id="empty-msg">Abhi koi message nahi hai.</p>
         {% endfor %}
     </div>
+
+    <div id="typing-indicator" class="typing"></div>
 
     <div class="input-bar">
         <input id="chat-input" type="text" placeholder="Message likho..." autofocus>
@@ -139,14 +152,56 @@
         const log = document.getElementById('chat-log');
         const input = document.getElementById('chat-input');
         const sendBtn = document.getElementById('chat-send');
+        const typingEl = document.getElementById('typing-indicator');
+
+        let typingTimeout = null;
+        let isTypingSent = false;
+        let hideTypingTimer = null;
 
         function scrollToBottom() {
             log.scrollTop = log.scrollHeight;
         }
         scrollToBottom();
 
+        // PIGEON: typing event bhejna
+        function sendTyping(state) {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({type: 'typing', is_typing: state}));
+            }
+        }
+
+        input.addEventListener('input', function () {
+            if (!isTypingSent) {
+                sendTyping(true);
+                isTypingSent = true;
+            }
+
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(function () {
+                sendTyping(false);
+                isTypingSent = false;
+            }, 1500);
+        });
+
         socket.onmessage = function (e) {
             const data = JSON.parse(e.data);
+
+            // PIGEON: doosre ka typing status
+            if (data.type === 'typing') {
+                typingEl.textContent = data.is_typing ? 'typing...' : '';
+
+                clearTimeout(hideTypingTimer);
+                if (data.is_typing) {
+                    hideTypingTimer = setTimeout(function () {
+                        typingEl.textContent = '';
+                    }, 3000);
+                }
+                return;
+            }
+
+            // asli message aaya to typing hata do
+            typingEl.textContent = '';
+
             const empty = document.getElementById('empty-msg');
             if (empty) empty.remove();
 
@@ -171,6 +226,13 @@
             socket.send(JSON.stringify({message: text}));
             input.value = '';
             input.focus();
+
+            // message bhejte hi typing band
+            clearTimeout(typingTimeout);
+            if (isTypingSent) {
+                sendTyping(false);
+                isTypingSent = false;
+            }
         }
 
         sendBtn.onclick = sendMessage;
@@ -178,6 +240,14 @@
             if (e.key === 'Enter') sendMessage();
         });
     </script>
+
+    <script>
+        const presenceScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+        const presenceSocket = new WebSocket(
+            `${presenceScheme}://${location.host}/ws/presence/`
+        );
+    </script>
+
 </body>
 
 </html>

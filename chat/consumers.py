@@ -1,4 +1,3 @@
-
 import json
 
 from django.db.models import Count
@@ -7,7 +6,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 from .models import Message, User
 
-ONLINE = {}   # user_id -> kitne sockets/tabs connected hain
+# user_id -> kitne sockets/tabs connected hain (dev ke liye in-memory)
+ONLINE = {}
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -45,6 +45,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         data = json.loads(text_data)
+
+        # typing event: database mein save nahi hota, bas forward hota hai
+        if data.get('type') == 'typing':
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'typing_status',
+                    'sender': self.user.username,
+                    'is_typing': bool(data.get('is_typing')),
+                },
+            )
+            return
+
         text = data.get('message', '').strip()
 
         if not text:
@@ -83,6 +96,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'sender': event['sender'],
         }))
 
+    async def typing_status(self, event):
+        # apna typing event khud ko wapas mat bhejo
+        if event['sender'] == self.user.username:
+            return
+
+        await self.send(text_data=json.dumps({
+            'type': 'typing',
+            'sender': event['sender'],
+            'is_typing': event['is_typing'],
+        }))
+
     @database_sync_to_async
     def get_user(self, username):
         return User.objects.filter(username=username).first()
@@ -97,11 +121,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def mark_read(self, message_id):
-        print("MARK_READ:", message_id, "by", self.user.username)
         Message.objects.filter(
             id=message_id,
             receiver=self.user
         ).update(is_read=True)
+
 
 class NotificationConsumer(AsyncWebsocketConsumer):
 
@@ -153,6 +177,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             .annotate(total=Count('id'))
             .values_list('sender_id', 'total')
         )
+
 
 class PresenceConsumer(AsyncWebsocketConsumer):
 
