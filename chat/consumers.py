@@ -7,6 +7,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 from .models import Message, User
 
+ONLINE = {}   # user_id -> kitne sockets/tabs connected hain
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
 
@@ -151,3 +153,54 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             .annotate(total=Count('id'))
             .values_list('sender_id', 'total')
         )
+
+class PresenceConsumer(AsyncWebsocketConsumer):
+
+    async def connect(self):
+        self.user = self.scope['user']
+
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        await self.channel_layer.group_add('presence', self.channel_name)
+        await self.accept()
+
+        ONLINE[self.user.id] = ONLINE.get(self.user.id, 0) + 1
+
+        # is naye socket ko abhi kaun online hai, wo bhej do
+        await self.send(text_data=json.dumps({
+            'type': 'initial',
+            'online': list(ONLINE.keys()),
+        }))
+
+        # agar yeh user ka pehla socket hai, sabko batao ki wo online aaya
+        if ONLINE[self.user.id] == 1:
+            await self.channel_layer.group_send('presence', {
+                'type': 'presence_update',
+                'user_id': self.user.id,
+                'online': True,
+            })
+
+    async def disconnect(self, close_code):
+        if not hasattr(self, 'user') or not self.user.is_authenticated:
+            return
+
+        await self.channel_layer.group_discard('presence', self.channel_name)
+
+        ONLINE[self.user.id] = ONLINE.get(self.user.id, 1) - 1
+
+        if ONLINE[self.user.id] <= 0:
+            ONLINE.pop(self.user.id, None)
+            await self.channel_layer.group_send('presence', {
+                'type': 'presence_update',
+                'user_id': self.user.id,
+                'online': False,
+            })
+
+    async def presence_update(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'update',
+            'user_id': event['user_id'],
+            'online': event['online'],
+        }))
