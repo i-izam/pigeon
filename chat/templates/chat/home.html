@@ -135,9 +135,26 @@
             background: #25d366;
         }
 
+        .name-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
         .name {
             font-size: 16px;
-            flex: 1;
+        }
+
+        .last-seen {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        /* user online hai to last seen chhupa do */
+        .user:has(.presence-dot.online) .last-seen {
+            display: none;
         }
 
         .badge {
@@ -191,7 +208,12 @@
                     <span class="presence-dot"></span>
                 </div>
 
-                <span class="name">{{ u.username }}</span>
+                <div class="name-wrap">
+                    <span class="name">{{ u.username }}</span>
+                    {% if u.last_seen %}
+                    <span class="last-seen">last seen {{ u.last_seen|date:"d M, h:i A" }}</span>
+                    {% endif %}
+                </div>
 
                 {% if u.unread %}
                 <span class="badge">{{ u.unread }}</span>
@@ -206,8 +228,7 @@
     </div>
 
     <script>
-        // Existing user search functionality
-
+        // ---------- User search ----------
         const search = document.getElementById('search');
         const items = document.querySelectorAll('.user');
         const noMatch = document.getElementById('no-match');
@@ -228,6 +249,117 @@
         });
 
 
-        // PIGEON: Real-time unread notifications
-
+        // ---------- WebSocket base ----------
         const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const host = window.location.host;
+
+        function getRow(userId) {
+            return document.querySelector('.user[data-user-id="' + userId + '"]');
+        }
+
+
+        // ---------- PIGEON: real-time unread notifications ----------
+        // NOTE: agar tumhare routing.py mein path alag hai to yahi URL badlo
+        function updateBadges(counts) {
+            items.forEach(function (row) {
+                const total = counts[row.dataset.userId] || 0;
+                let badge = row.querySelector('.badge');
+
+                if (total > 0) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'badge';
+                        row.appendChild(badge);
+                    }
+                    badge.textContent = total;
+                } else if (badge) {
+                    badge.remove();
+                }
+            });
+        }
+
+        function connectNotifications() {
+            const ws = new WebSocket(scheme + '://' + host + '/ws/notifications/');
+
+            ws.onmessage = function (e) {
+                const data = JSON.parse(e.data);
+                if (data.type === 'unread_update') {
+                    updateBadges(data.counts || {});
+                }
+            };
+
+            ws.onclose = function () {
+                setTimeout(connectNotifications, 3000);
+            };
+        }
+
+
+        // ---------- PIGEON: online/offline dots + live last seen ----------
+        function pad(n) {return String(n).padStart(2, '0');}
+
+        function formatNow() {
+            const d = new Date();
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            let h = d.getHours();
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            return pad(d.getDate()) + ' ' + months[d.getMonth()] + ', ' +
+                pad(h) + ':' + pad(d.getMinutes()) + ' ' + ampm;
+        }
+
+        function setOnline(userId, online) {
+            const row = getRow(userId);
+            if (!row) return;
+
+            const dot = row.querySelector('.presence-dot');
+            if (dot) dot.classList.toggle('online', online);
+        }
+
+        function setLastSeenNow(userId) {
+            const row = getRow(userId);
+            if (!row) return;
+
+            const wrap = row.querySelector('.name-wrap');
+            let el = wrap.querySelector('.last-seen');
+
+            if (!el) {
+                el = document.createElement('span');
+                el.className = 'last-seen';
+                wrap.appendChild(el);
+            }
+            el.textContent = 'last seen ' + formatNow();
+        }
+
+        function connectPresence() {
+            const ws = new WebSocket(scheme + '://' + host + '/ws/presence/');
+
+            ws.onmessage = function (e) {
+                const data = JSON.parse(e.data);
+
+                if (data.type === 'initial') {
+                    const onlineIds = data.online.map(String);
+                    items.forEach(function (row) {
+                        setOnline(row.dataset.userId, onlineIds.includes(row.dataset.userId));
+                    });
+                }
+
+                if (data.type === 'update') {
+                    setOnline(data.user_id, data.online);
+                    if (data.online === false) {
+                        setLastSeenNow(data.user_id);
+                    }
+                }
+            };
+
+            ws.onclose = function () {
+                setTimeout(connectPresence, 3000);
+            };
+        }
+
+        connectNotifications();
+        connectPresence();
+    </script>
+</body>
+
+</html>

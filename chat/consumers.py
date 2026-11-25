@@ -3,8 +3,8 @@ import json
 from django.db.models import Count
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-
 from .models import Message, User
+from django.utils import timezone
 
 # user_id -> kitne sockets/tabs connected hain (dev ke liye in-memory)
 ONLINE = {}
@@ -217,6 +217,7 @@ class PresenceConsumer(AsyncWebsocketConsumer):
 
         if ONLINE[self.user.id] <= 0:
             ONLINE.pop(self.user.id, None)
+            await self.save_last_seen()
             await self.channel_layer.group_send('presence', {
                 'type': 'presence_update',
                 'user_id': self.user.id,
@@ -229,3 +230,7 @@ class PresenceConsumer(AsyncWebsocketConsumer):
             'user_id': event['user_id'],
             'online': event['online'],
         }))
+
+    @database_sync_to_async
+    def save_last_seen(self):
+        User.objects.filter(id=self.user.id).update(last_seen=timezone.now())

@@ -4,8 +4,8 @@ from django.db import models
 
 
 class User(AbstractUser):
-    pass
-
+    # ... tumhari existing fields ...
+    last_seen = models.DateTimeField(null=True, blank=True)
 
 class Message(models.Model):
     sender = models.ForeignKey(
