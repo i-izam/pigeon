@@ -7,6 +7,10 @@ websocket_urlpatterns = [
         consumers.ChatConsumer.as_asgi()
     ),
     path(
+        'ws/group/<int:group_id>/',
+        consumers.GroupChatConsumer.as_asgi()
+    ),
+    path(
         'ws/notifications/',
         consumers.NotificationConsumer.as_asgi()
     ),

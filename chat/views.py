@@ -7,7 +7,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from .forms import SignupForm
-from .models import Message, User
+from .models import ChatGroup, Message, User
 
 
 def splash(request):
@@ -47,7 +47,12 @@ def home(request):
         .order_by('username')
     )
 
-    return render(request, 'chat/home.html', {'users': users})
+    groups = request.user.chat_groups.order_by('name')
+
+    return render(request, 'chat/home.html', {
+        'users': users,
+        'groups': groups,
+    })
 
 
 @login_required
@@ -92,4 +97,47 @@ def chat_room(request, username):
     return render(request, 'chat/room.html', {
         'other': other,
         'messages': messages,
+    })
+
+
+@login_required
+def create_group(request):
+    users = User.objects.exclude(id=request.user.id).order_by('username')
+    error = ''
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        raw_ids = request.POST.getlist('members')
+        member_ids = [i for i in raw_ids if i.isdigit()]
+        members = User.objects.filter(id__in=member_ids).exclude(
+            id=request.user.id
+        )
+
+        if not name:
+            error = 'Group ka naam likho.'
+        elif not members.exists():
+            error = 'Kam se kam ek member chuno.'
+        else:
+            group = ChatGroup.objects.create(
+                name=name,
+                created_by=request.user,
+            )
+            group.members.add(request.user, *members)
+            return redirect('group_room', group_id=group.id)
+
+    return render(request, 'chat/create_group.html', {
+        'users': users,
+        'error': error,
+    })
+
+
+@login_required
+def group_room(request, group_id):
+    # sirf members hi group dekh sakte hain
+    group = get_object_or_404(ChatGroup, id=group_id, members=request.user)
+
+    return render(request, 'chat/group_room.html', {
+        'group': group,
+        'members': group.members.order_by('username'),
+        'messages': group.messages.select_related('sender'),
     })

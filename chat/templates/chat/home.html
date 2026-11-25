@@ -79,14 +79,40 @@
             margin-bottom: 12px;
         }
 
+        /* PIGEON: groups section */
+        .section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: bold;
+            color: #075e54;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin: 4px 4px 8px;
+        }
+
+        .new-group {
+            background: #075e54;
+            color: #fff;
+            text-decoration: none;
+            font-size: 12px;
+            text-transform: none;
+            letter-spacing: 0;
+            padding: 5px 12px;
+            border-radius: 14px;
+        }
+
         .list {
             background: #fff;
             border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+            margin-bottom: 16px;
         }
 
-        .user {
+        .user,
+        .group-item {
             display: flex;
             align-items: center;
             gap: 14px;
@@ -96,11 +122,13 @@
             border-bottom: 1px solid #f0f0f0;
         }
 
-        .user:last-child {
+        .user:last-child,
+        .group-item:last-child {
             border-bottom: none;
         }
 
-        .user:hover {
+        .user:hover,
+        .group-item:hover {
             background: #f5f5f5;
         }
 
@@ -117,6 +145,10 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+        }
+
+        .group-avatar {
+            background: #128c7e;
         }
 
         /* PIGEON: online / offline dot on avatar */
@@ -144,6 +176,12 @@
 
         .name {
             font-size: 16px;
+        }
+
+        .sub {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
         }
 
         .last-seen {
@@ -196,6 +234,30 @@
     </div>
 
     <div class="container">
+
+        <div class="section-head">
+            <span>Groups</span>
+            <a class="new-group" href="{% url 'create_group' %}">+ New Group</a>
+        </div>
+
+        {% if groups %}
+        <div class="list">
+            {% for g in groups %}
+            <a class="group-item" href="{% url 'group_room' g.id %}">
+                <div class="avatar group-avatar">{{ g.name|first|upper }}</div>
+                <div class="name-wrap">
+                    <span class="name">{{ g.name }}</span>
+                    <span class="sub">{{ g.members.count }} members</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="section-head">
+            <span>Chats</span>
+        </div>
+
         <input id="search" class="search" type="text" placeholder="Search users..." autocomplete="off">
 
         <div class="list" id="user-list">
@@ -259,7 +321,6 @@
 
 
         // ---------- PIGEON: real-time unread notifications ----------
-        // NOTE: agar tumhare routing.py mein path alag hai to yahi URL badlo
         function updateBadges(counts) {
             items.forEach(function (row) {
                 const total = counts[row.dataset.userId] || 0;

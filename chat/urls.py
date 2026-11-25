@@ -10,5 +10,6 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('chat/<str:username>/', views.chat_room, name='chat_room'),
-    
+    path('groups/new/', views.create_group, name='create_group'),
+    path('group/<int:group_id>/', views.group_room, name='group_room'),
 ]

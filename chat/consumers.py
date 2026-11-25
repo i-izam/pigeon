@@ -5,7 +5,7 @@ from django.utils import timezone
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-from .models import Message, User
+from .models import ChatGroup, GroupMessage, Message, User
 
 # user_id -> kitne sockets/tabs connected hain (dev ke liye in-memory)
 ONLINE = {}
@@ -145,6 +145,81 @@ class ChatConsumer(AsyncWebsocketConsumer):
             id=message_id,
             receiver=self.user
         ).update(is_read=True)
+
+
+class GroupChatConsumer(AsyncWebsocketConsumer):
+
+    async def connect(self):
+        self.user = self.scope['user']
+
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        self.group_id = self.scope['url_route']['kwargs']['group_id']
+
+        # sirf group ke members hi connect kar sakte hain
+        if not await self.is_member():
+            await self.close()
+            return
+
+        self.group_name = f'group_{self.group_id}'
+
+        await self.channel_layer.group_add(
+            self.group_name,
+            self.channel_name
+        )
+
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(
+                self.group_name,
+                self.channel_name
+            )
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        text = data.get('message', '').strip()
+
+        if not text:
+            return
+
+        msg = await self.save_group_message(text)
+        sent_time = timezone.localtime(msg.timestamp).strftime('%H:%M')
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                'type': 'group_message',
+                'message': text,
+                'sender': self.user.username,
+                'time': sent_time,
+            },
+        )
+
+    async def group_message(self, event):
+        await self.send(text_data=json.dumps({
+            'message': event['message'],
+            'sender': event['sender'],
+            'time': event['time'],
+        }))
+
+    @database_sync_to_async
+    def is_member(self):
+        return ChatGroup.objects.filter(
+            id=self.group_id,
+            members=self.user
+        ).exists()
+
+    @database_sync_to_async
+    def save_group_message(self, text):
+        return GroupMessage.objects.create(
+            group_id=self.group_id,
+            sender=self.user,
+            text=text
+        )
 
 
 class NotificationConsumer(AsyncWebsocketConsumer):
