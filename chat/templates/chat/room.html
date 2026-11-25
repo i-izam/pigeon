@@ -39,6 +39,13 @@
             font-size: 18px;
         }
 
+        /* PIGEON: online / last seen header mein */
+        .header .status {
+            font-size: 12px;
+            opacity: 0.85;
+            margin-top: 2px;
+        }
+
         #chat-log {
             flex: 1;
             overflow-y: auto;
@@ -68,6 +75,16 @@
             color: #888;
             text-align: right;
             margin-top: 2px;
+        }
+
+        /* PIGEON: seen ticks */
+        .tick {
+            margin-left: 4px;
+            color: #888;
+        }
+
+        .tick.read {
+            color: #34b7f1;
         }
 
         #empty-msg {
@@ -117,6 +134,7 @@
         <a href="{% url 'home' %}">&larr;</a>
         <div>
             <h2>{{ other.username }}</h2>
+            <div id="status" class="status" data-last-seen="{{ other.last_seen|date:'d M, h:i A' }}"></div>
         </div>
     </div>
 
@@ -124,7 +142,16 @@
         {% for m in messages %}
         <div class="msg {% if m.sender == request.user %}me{% endif %}">
             {{ m.text }}
-            <span class="time">{{ m.timestamp|date:"H:i" }}</span>
+            <span class="time">
+                {{ m.timestamp|date:"H:i" }}
+                {% if m.sender == request.user %}
+                {% if m.is_read %}
+                <span class="tick read">✓✓</span>
+                {% else %}
+                <span class="tick">✓</span>
+                {% endif %}
+                {% endif %}
+            </span>
         </div>
         {% empty %}
         <p id="empty-msg">Abhi koi message nahi hai.</p>
@@ -139,6 +166,7 @@
     </div>
 
     {{ other.username|json_script:"other-username" }}
+    {{ other.id|json_script:"other-id" }}
     {{ request.user.username|json_script:"my-username" }}
 
     <script>
@@ -163,6 +191,14 @@
         }
         scrollToBottom();
 
+        // PIGEON: saare apne messages par blue ✓✓ lagao
+        function markAllRead() {
+            document.querySelectorAll('.msg.me .tick').forEach(function (t) {
+                t.textContent = '✓✓';
+                t.classList.add('read');
+            });
+        }
+
         // PIGEON: typing event bhejna
         function sendTyping(state) {
             if (socket.readyState === WebSocket.OPEN) {
@@ -185,6 +221,12 @@
 
         socket.onmessage = function (e) {
             const data = JSON.parse(e.data);
+
+            // PIGEON: doosre ne messages padh liye
+            if (data.type === 'read') {
+                markAllRead();
+                return;
+            }
 
             // PIGEON: doosre ka typing status
             if (data.type === 'typing') {
@@ -214,6 +256,15 @@
             time.textContent = new Date().toLocaleTimeString([], {
                 hour: '2-digit', minute: '2-digit', hour12: false
             });
+
+            // apna message hai to ✓ lagao
+            if (data.sender === me) {
+                const tick = document.createElement('span');
+                tick.className = 'tick';
+                tick.textContent = '✓';
+                time.appendChild(tick);
+            }
+
             div.appendChild(time);
 
             log.appendChild(div);
@@ -242,10 +293,58 @@
     </script>
 
     <script>
-        const presenceScheme = location.protocol === 'https:' ? 'wss' : 'ws';
-        const presenceSocket = new WebSocket(
-            `${presenceScheme}://${location.host}/ws/presence/`
-        );
+        // PIGEON: room header mein online / last seen
+        const otherId = JSON.parse(document.getElementById('other-id').textContent);
+        const statusEl = document.getElementById('status');
+
+        const savedLastSeen = statusEl.dataset.lastSeen;
+        let currentOfflineText = savedLastSeen ? 'last seen ' + savedLastSeen : 'offline';
+        statusEl.textContent = currentOfflineText;
+
+        function pad(n) {return String(n).padStart(2, '0');}
+
+        function formatNow() {
+            const d = new Date();
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            let h = d.getHours();
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            return pad(d.getDate()) + ' ' + months[d.getMonth()] + ', ' +
+                pad(h) + ':' + pad(d.getMinutes()) + ' ' + ampm;
+        }
+
+        function setStatus(online) {
+            statusEl.textContent = online ? 'online' : currentOfflineText;
+        }
+
+        function connectPresence() {
+            const presenceScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+            const presenceSocket = new WebSocket(
+                `${presenceScheme}://${location.host}/ws/presence/`
+            );
+
+            presenceSocket.onmessage = function (e) {
+                const data = JSON.parse(e.data);
+
+                if (data.type === 'initial') {
+                    setStatus(data.online.includes(otherId));
+                }
+
+                if (data.type === 'update' && data.user_id === otherId) {
+                    if (!data.online) {
+                        currentOfflineText = 'last seen ' + formatNow();
+                    }
+                    setStatus(data.online);
+                }
+            };
+
+            presenceSocket.onclose = function () {
+                setTimeout(connectPresence, 3000);
+            };
+        }
+
+        connectPresence();
     </script>
 
 </body>

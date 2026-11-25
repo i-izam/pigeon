@@ -1,4 +1,3 @@
-
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
@@ -10,8 +9,10 @@ from channels.layers import get_channel_layer
 from .forms import SignupForm
 from .models import Message, User
 
+
 def splash(request):
     return render(request, 'chat/splash.html')
+
 
 def signup(request):
     if request.user.is_authenticated:
@@ -65,10 +66,21 @@ def chat_room(request, username):
     if updated:
         channel_layer = get_channel_layer()
 
+        # home page ka unread badge update karo
         async_to_sync(channel_layer.group_send)(
             f'notifications_{request.user.id}',
             {
                 'type': 'unread_update'
+            }
+        )
+
+        # sender ke khule room mein ✓✓ dikhao
+        a, b = sorted([request.user.id, other.id])
+        async_to_sync(channel_layer.group_send)(
+            f'chat_{a}_{b}',
+            {
+                'type': 'messages_read',
+                'reader': request.user.username,
             }
         )
 

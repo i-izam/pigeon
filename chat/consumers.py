@@ -1,10 +1,11 @@
 import json
 
 from django.db.models import Count
+from django.utils import timezone
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+
 from .models import Message, User
-from django.utils import timezone
 
 # user_id -> kitne sockets/tabs connected hain (dev ke liye in-memory)
 ONLINE = {}
@@ -85,6 +86,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if event['sender'] != self.user.username:
             await self.mark_read(event['id'])
 
+            # sender ko batao ki message dekh liya gaya (✓✓)
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'messages_read',
+                    'reader': self.user.username,
+                },
+            )
+
             # Update unread count for the current user
             await self.channel_layer.group_send(
                 f'notifications_{self.user.id}',
@@ -94,6 +104,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'message': event['message'],
             'sender': event['sender'],
+        }))
+
+    async def messages_read(self, event):
+        # jisne padha usko ye event wapas mat bhejo
+        if event['reader'] == self.user.username:
+            return
+
+        await self.send(text_data=json.dumps({
+            'type': 'read',
+            'reader': event['reader'],
         }))
 
     async def typing_status(self, event):
